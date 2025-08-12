@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Top 10 Composition</title>
+  <!-- absolute paths so they resolve no matter where this page lives -->
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <style>
+    #compositionChart { min-width:300px; height:600px; margin:auto }
+    .controls { margin-bottom:1rem; }
+  </style>
+</head>
+<body style="background:#f5f5f5;">
+  <div class="container py-4">
+    <div class="card border-light">
+      <div class="card-body">
+        <h3 class="custom_text">Top 10 Microbiome Composition</h3>
+        <div class="controls">
+          <select class="btn btn-outline-dark" id="conditionSelect">
+            <option value="Detail">Detail</option>
+            <option value="Location">Location</option>
+            <option value="Site">Site</option>
+            <option value="Type">Type</option>
+            <option value="Group">Group</option>
+          </select>
+          <select class="btn btn-outline-dark" id="levelSelect">
+            <option>Phylum</option>
+            <option>Class</option>
+            <option>Order</option>
+            <option>Family</option>
+            <option>Genus</option>
+            <option>Species</option>
+          </select>
+        </div>
+        <div id="compositionChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- dependencies -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+
+  <script>
+  let rows = [];
+  // ⚠️ point this at your CSV under /data
+  Papa.parse('/data/composition.csv', {
+    header: true, download: true, skipEmptyLines: true,
+    complete: ({ data }) => { rows = data; drawChart(); }
+  });
+
+  $('#conditionSelect,#levelSelect').on('change', drawChart);
+
+  function drawChart() {
+    const cond = $('#conditionSelect').val(),
+          lvl  = $('#levelSelect').val(),
+          sub  = rows.filter(r => r.Condition===cond && r.Level===lvl);
+
+    // 1) all the distinct groups along the x-axis
+    const cats = [...new Set(sub.map(r=>r.Value))];
+
+    // 2) find the top 10 taxa by total abundance
+    const taxa = [...new Set(sub.map(r=>r.Taxon))];
+    const sums = taxa.map(t => ({
+      taxon: t,
+      tot: sub.filter(r=>r.Taxon===t)
+              .reduce((s,r)=>s + (+r.Abundance), 0)
+    }));
+    sums.sort((a,b)=>b.tot - a.tot);
+    const top10 = sums.slice(0,10).map(x=>x.taxon);
+
+    // 3) build a Highcharts series for each of the top 10 + “Others”
+    const series = top10.map(t => ({
+      name: t,
+      data: cats.map(cat => {
+        const row = sub.find(x=>x.Taxon===t && x.Value===cat);
+        return row ? +row.Abundance : 0;
+      })
+    }));
+    // “Others” = total – sum(top10)
+    series.push({
+      name: 'Others',
+      data: cats.map(cat => {
+        const total  = sub.filter(r=>r.Value===cat)
+                         .reduce((s,r)=>s + (+r.Abundance), 0);
+        const topSum = top10.reduce((s,tax)=>
+                          s + (sub.find(x=>x.Taxon===tax && x.Value===cat)?.Abundance||0)
+                        , 0);
+        return total - topSum;
+      })
+    });
+
+    Highcharts.chart('compositionChart', {
+      chart: { type: 'column', height: 600 },
+      title: { text: lvl },
+      xAxis: {
+        categories: cats,
+        labels: { style: { fontSize: '16px' } }
+      },
+      yAxis: {
+        min: 0, max: 100,
+        title: { text: 'Avg % Abundance' },
+        labels: { format: '{value}%' }
+      },
+      tooltip: { pointFormat: '{series.name}: {point.y:.2f}%' },
+      plotOptions: { column: { stacking: 'percent' } },
+      series,
+      legend: {
+        align: 'center',
+        itemStyle: { fontSize: '14px' },
+        maxHeight: 200
+      },
+      credits: { enabled: false }
+    });
+  }
+  </script>
+</body>
+</html>
