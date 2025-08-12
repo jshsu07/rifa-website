@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample Browser</title>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+  <!-- Your site overrides -->
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+</head>
+
+<body style="background-color: #f5f5f5;">
+  <!-- (Optional) Your shared navbar here -->
+
+  <br>
+  <div class="container">
+    <div class="card border-light">
+      <div class="card-body">
+        <h3 class="custom_text">Sample Browser</h3>
+
+        <div id="toggleButtons" class="mb-3">
+          <p>Show / hide columns:</p>
+          <!-- buttons will be injected here -->
+        </div>
+
+        <table id="overview_table" class="display nowrap" style="width:100%">
+          <thead><!-- auto-populated --></thead>
+          <tbody><!-- empty; filled by JS --></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dependencies -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.1/papaparse.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedheader/3.3.2/js/dataTables.fixedHeader.min.js"></script>
+
+  <script>
+    $(document).ready(function(){
+      Papa.parse('/data/sample_metadata.csv', {
+        header: true,
+        download: true,
+        dynamicTyping: true,
+        complete: function(results) {
+          const data = results.data;
+          // Build columns descriptor for DataTables
+          const columns = Object.keys(data[0]).map(k => ({ data: k, title: k }));
+          // Populate <thead>
+          const $thead = $('#overview_table thead').empty();
+          const $headerRow = $('<tr>');
+          columns.forEach(col => $headerRow.append(`<th>${col.title}</th>`));
+          $thead.append($headerRow);
+
+          // Initialize DataTable
+          const table = $('#overview_table').DataTable({
+            data: data,
+            columns: columns,
+            dom: 'Bfrtip',
+            buttons: ['copy','csv','excel'],
+            scrollX: true,
+            fixedHeader: true,
+            orderCellsTop: true,
+            exportOptions: { rows: 'visible' }
+          });
+
+          // Create toggle buttons
+          const $toggles = $('#toggleButtons');
+          columns.forEach((col, idx) => {
+            const $btn = $(`<button class="btn btn-outline-info toggle-vis mr-1 mb-1" data-column="${idx}">${col.title}</button>`);
+            $toggles.append($btn);
+          });
+
+          // Toggle visibility handler
+          $('button.toggle-vis').on('click', function(e) {
+            e.preventDefault();
+            const colIdx = $(this).data('column');
+            const col = table.column(colIdx);
+            col.visible(!col.visible());
+            $(this).toggleClass('active');
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
